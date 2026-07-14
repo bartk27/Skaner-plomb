@@ -1,0 +1,695 @@
+# Skaner-plomb
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Skaner plomb</title>
+
+<style>
+body {
+    font-family: Arial, sans-serif;
+    background:#111;
+    color:white;
+    padding:15px;
+}
+
+h1 {
+    text-align:center;
+}
+
+input, button {
+    width:100%;
+    padding:15px;
+    margin:5px 0;
+    font-size:18px;
+    border-radius:8px;
+    border:none;
+}
+
+button {
+    background:#1976d2;
+    color:white;
+    cursor:pointer;
+}
+
+button.red {
+    background:#c62828;
+}
+
+.panel {
+    background:#222;
+    padding:15px;
+    border-radius:10px;
+    margin-bottom:15px;
+}
+
+.counter {
+    font-size:22px;
+    margin:8px 0;
+}
+
+#scanList {
+    max-height:300px;
+    overflow:auto;
+    background:#000;
+    padding:10px;
+}
+
+.scan {
+    padding:5px;
+    border-bottom:1px solid #444;
+}
+
+.error {
+    color:#ff5252;
+    font-size:20px;
+    text-align:center;
+}
+</style>
+
+</head>
+
+<body>
+
+<h1>SKANER PLOMB</h1>
+
+<div class="panel">
+
+<input id="registration" placeholder="Numer rejestracyjny">
+
+<input id="operator" placeholder="Operator">
+
+</div>
+
+
+<div class="panel">
+
+<button onclick="startUnload()">Start rozładunku</button>
+<button onclick="startClean()">Start sprzątania</button>
+
+<p>Rozładunek: <span id="unloadTime">00:00:00</span></p>
+<p>Sprzątanie: <span id="cleanTime">00:00:00</span></p>
+
+</div>
+
+
+<div class="panel">
+
+<input id="scanner" 
+placeholder="Skanuj plombę"
+autocomplete="off"
+>
+
+<div id="message"></div>
+
+</div>
+
+
+<div class="panel">
+
+<div class="counter">
+Plomby 01:
+<span id="count01">0</span>
+</div>
+
+<div class="counter">
+Plomby 05:
+<span id="count05">0</span>
+</div>
+
+<div class="counter">
+Razem:
+<span id="total">0</span>
+</div>
+
+<div class="counter">
+Wydajność:
+<span id="speed">0</span> plomb/min
+</div>
+
+</div>
+
+
+<div class="panel">
+
+<button onclick="removeLast()">
+Usuń ostatni skan
+</button>
+
+<button class="red" onclick="resetAll()">
+Wyzeruj
+</button>
+
+</div>
+
+
+<div class="panel">
+
+<h3>Lista skanów</h3>
+
+<div id="scanList"></div>
+
+</div>
+
+
+<script>
+
+let scans=[];
+
+let startUnloadTime=null;
+let startCleanTime=null;
+
+let unloadSeconds=0;
+let cleanSeconds=0;
+
+
+const scanner=document.getElementById("scanner");
+
+
+scanner.focus();
+
+
+scanner.addEventListener("keypress",function(e){
+
+if(e.key==="Enter"){
+
+let code=scanner.value.trim();
+
+scanner.value="";
+
+scan(code);
+
+}
+
+});
+
+
+
+function scan(code){
+
+let msg=document.getElementById("message");
+
+
+if(!(code.startsWith("01") || code.startsWith("05"))){
+
+msg.innerHTML="❌ Nieprawidłowa plomba";
+return;
+
+}
+
+
+if(scans.includes(code)){
+
+msg.innerHTML="⚠️ Ta plomba została już zeskanowana!";
+return;
+
+}
+
+
+scans.push(code);
+
+
+msg.innerHTML="✅ Dodano "+code;
+
+
+update();
+
+}
+
+
+
+function update(){
+
+
+let c01=scans.filter(x=>x.startsWith("01")).length;
+
+let c05=scans.filter(x=>x.startsWith("05")).length;
+
+
+document.getElementById("count01").innerHTML=c01;
+
+document.getElementById("count05").innerHTML=c05;
+
+document.getElementById("total").innerHTML=scans.length;
+
+
+
+let list="";
+
+scans.forEach((x,i)=>{
+
+list+=`
+<div class="scan">
+${i+1}. ${x}
+</div>`;
+
+});
+
+
+document.getElementById("scanList").innerHTML=list;
+
+
+calculateSpeed();
+
+}
+
+
+
+function removeLast(){
+
+scans.pop();
+
+update();
+
+}
+
+
+
+function resetAll(){
+
+
+if(confirm(
+"Czy na pewno usunąć cały raport? Tej operacji nie można cofnąć."
+)){
+
+
+scans=[];
+
+startUnloadTime=null;
+startCleanTime=null;
+
+unloadSeconds=0;
+cleanSeconds=0;
+
+update();
+
+}
+
+}
+
+
+
+
+function startUnload(){
+
+if(!startUnloadTime)
+startUnloadTime=new Date();
+
+}
+
+
+
+function startClean(){
+
+if(!startCleanTime)
+startCleanTime=new Date();
+
+}
+
+
+
+setInterval(()=>{
+
+
+if(startUnloadTime){
+
+unloadSeconds++;
+
+document.getElementById("unloadTime").innerHTML=
+formatTime(unloadSeconds);
+
+}
+
+
+if(startCleanTime){
+
+cleanSeconds++;
+
+document.getElementById("cleanTime").innerHTML=
+formatTime(cleanSeconds);
+
+}
+
+
+calculateSpeed();
+
+
+},1000);
+
+
+
+function calculateSpeed(){
+
+if(unloadSeconds>0){
+
+let speed=scans.length/unloadSeconds*60;
+
+document.getElementById("speed").innerHTML=
+speed.toFixed(1);
+
+}
+
+}
+
+
+
+function formatTime(sec){
+
+let h=Math.floor(sec/3600);
+
+let m=Math.floor((sec%3600)/60);
+
+let s=sec%60;
+
+
+return [
+h,m,s
+].map(x=>String(x).padStart(2,"0")).join(":");
+
+}
+
+
+</script>
+
+</body>
+</html>
+<button onclick="exportExcel()">
+Zapisz raport Excel
+</button>
+
+<button onclick="newReport()">
+Nowy rozładunek
+</button>
+
+<div class="panel">
+<h3>Historia raportów</h3>
+<div id="history"></div>
+</div>
+// AUTOMATYCZNY ZAPIS DANYCH
+
+function saveBackup(){
+
+let data={
+    registration:
+    document.getElementById("registration").value,
+
+    operator:
+    document.getElementById("operator").value,
+
+    scans:scans,
+
+    unloadSeconds:unloadSeconds,
+
+    cleanSeconds:cleanSeconds
+};
+
+localStorage.setItem(
+"currentReport",
+JSON.stringify(data)
+);
+
+}
+
+
+setInterval(saveBackup,5000);
+
+
+// WCZYTANIE PO URUCHOMIENIU
+
+window.onload=function(){
+
+let saved=
+localStorage.getItem("currentReport");
+
+
+if(saved){
+
+let data=JSON.parse(saved);
+
+
+document.getElementById("registration").value=
+data.registration || "";
+
+document.getElementById("operator").value=
+data.operator || "";
+
+scans=data.scans || [];
+
+unloadSeconds=data.unloadSeconds || 0;
+
+cleanSeconds=data.cleanSeconds || 0;
+
+
+update();
+
+}
+
+showHistory();
+
+};
+
+
+
+// EKSPORT EXCEL
+
+function exportExcel(){
+
+
+let reg=
+document.getElementById("registration").value || "BRAK";
+
+
+let operator=
+document.getElementById("operator").value || "BRAK";
+
+
+let rows=[];
+
+
+rows.push([
+"Numer",
+"Plomba",
+"Typ",
+"Godzina"
+]);
+
+
+scans.forEach((x,i)=>{
+
+
+rows.push([
+i+1,
+x,
+x.substring(0,2),
+new Date().toLocaleString()
+]);
+
+
+});
+
+
+
+rows.push([]);
+
+rows.push([
+"Rejestracja",
+reg
+]);
+
+rows.push([
+"Operator",
+operator
+]);
+
+rows.push([
+"Plomb 01",
+scans.filter(x=>x.startsWith("01")).length
+]);
+
+rows.push([
+"Plomb 05",
+scans.filter(x=>x.startsWith("05")).length
+]);
+
+rows.push([
+"Razem",
+scans.length
+]);
+
+rows.push([
+"Wydajność plomb/min",
+(scans.length/unloadSeconds*60).toFixed(2)
+]);
+
+
+
+let csv="\ufeff";
+
+rows.forEach(r=>{
+
+csv+=r.join(";")+"\n";
+
+});
+
+
+
+let blob=new Blob(
+[csv],
+{
+type:
+"application/vnd.ms-excel"
+}
+);
+
+
+let a=document.createElement("a");
+
+a.href=
+URL.createObjectURL(blob);
+
+
+a.download=
+new Date().toISOString().slice(0,10)
++"_"+reg+".xlsx";
+
+
+a.click();
+
+
+
+saveHistory();
+
+}
+
+
+
+// ZAPIS HISTORII
+
+function saveHistory(){
+
+
+let history=
+JSON.parse(
+localStorage.getItem("history") || "[]"
+);
+
+
+
+history.push({
+
+date:
+new Date().toLocaleString(),
+
+registration:
+document.getElementById("registration").value,
+
+operator:
+document.getElementById("operator").value,
+
+count:
+scans.length,
+
+data:scans
+
+});
+
+
+localStorage.setItem(
+"history",
+JSON.stringify(history)
+);
+
+
+showHistory();
+
+
+}
+
+
+
+// WYŚWIETLENIE HISTORII
+
+function showHistory(){
+
+
+let box=
+document.getElementById("history");
+
+
+if(!box)return;
+
+
+let history=
+JSON.parse(
+localStorage.getItem("history") || "[]"
+);
+
+
+box.innerHTML="";
+
+
+history.reverse().forEach((h,i)=>{
+
+
+box.innerHTML+=`
+
+<div class="scan">
+
+${h.date}<br>
+
+Auto:
+${h.registration}<br>
+
+Operator:
+${h.operator}<br>
+
+Plomby:
+${h.count}
+
+</div>
+
+`;
+
+});
+
+
+}
+
+
+
+// NOWY ROZŁADUNEK
+
+function newReport(){
+
+
+if(confirm(
+"Zapisać obecny raport i rozpocząć nowy?"
+)){
+
+
+saveHistory();
+
+
+scans=[];
+
+unloadSeconds=0;
+
+cleanSeconds=0;
+
+startUnloadTime=null;
+
+startCleanTime=null;
+
+
+document.getElementById("registration").value="";
+
+document.getElementById("operator").value="";
+
+
+update();
+
+
+}
+
+}
